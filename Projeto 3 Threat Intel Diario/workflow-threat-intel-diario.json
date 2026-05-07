@@ -1,0 +1,234 @@
+{
+  "name": "Threat Intel Diario com IA",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "p3-node-001",
+      "name": "Todo dia as 8h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://feeds.feedburner.com/TheHackersNews"
+      },
+      "id": "p3-node-002",
+      "name": "RSS The Hacker News",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [500, 140]
+    },
+    {
+      "parameters": {
+        "url": "https://www.bleepingcomputer.com/feed/"
+      },
+      "id": "p3-node-003",
+      "name": "RSS BleepingComputer",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://krebsonsecurity.com/feed/"
+      },
+      "id": "p3-node-004",
+      "name": "RSS KrebsOnSecurity",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [500, 460]
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "id": "p3-node-005",
+      "name": "Juntar HN e Bleeping",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [760, 220]
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "id": "p3-node-006",
+      "name": "Juntar todos os feeds",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1020, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst now = new Date();\nconst yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);\n\nfunction getSource(link) {\n  if (!link) return 'Desconhecido';\n  if (link.includes('thehackernews')) return 'The Hacker News';\n  if (link.includes('bleepingcomputer')) return 'Bleeping Computer';\n  if (link.includes('krebsonsecurity')) return 'KrebsOnSecurity';\n  return 'Outro';\n}\n\nconst recent = items.filter(item => {\n  const dateStr = item.json.pubDate || item.json.isoDate || item.json.date;\n  if (!dateStr) return true;\n  return new Date(dateStr) >= yesterday;\n});\n\nif (recent.length === 0) {\n  return [{ json: { noNews: true, totalArticles: 0 } }];\n}\n\nconst lista = recent.map((item, i) => {\n  const source = getSource(item.json.link);\n  const title = item.json.title || 'Sem titulo';\n  const link = item.json.link || '';\n  const snippet = (item.json.contentSnippet || item.json.summary || '').substring(0, 400);\n  return `${i + 1}. [${source}] ${title}\\nLink: ${link}\\n${snippet}`;\n}).join('\\n\\n---\\n\\n');\n\nconst prompt = `Voce e um analista senior de cyberseguranca. Analise as ${recent.length} noticias abaixo das ultimas 24h e gere um digest em HTML.\n\nPara cada noticia use este formato:\n<div style=\"border-left:4px solid #e74c3c;padding:10px;margin:10px 0;background:#fff\">\n  <span style=\"font-size:11px;font-weight:bold;color:COR\">CRITICIDADE: NIVEL</span>\n  <h3 style=\"margin:4px 0\">[TITULO DA NOTICIA]</h3>\n  <p style=\"color:#444\">RESUMO EM 2-3 FRASES EM PORTUGUES SOBRE O IMPACTO.</p>\n  <a href=\"LINK\" style=\"color:#3498db\">Leia a noticia completa</a>\n</div>\n\nCores por criticidade: ALTA=#e74c3c, MEDIA=#f39c12, BAIXA=#27ae60\n\nCriterios:\n- ALTA: vuln critica (CVSS 9+), ataque ativo em larga escala, breach massivo de dados\n- MEDIA: patch importante, nova tecnica de ataque, campanha de phishing significativa\n- BAIXA: pesquisa academica, tendencia de mercado, noticia informativa\n\nAo final adicione:\n<div style=\"background:#2c3e50;color:#fff;padding:15px;border-radius:6px;margin-top:20px\">\n  <h2 style=\"margin:0 0 10px\">Briefing Executivo do Dia</h2>\n  <p style=\"margin:0;line-height:1.6\">PARAGRAFO DE 4-5 LINHAS RESUMINDO OS TEMAS MAIS CRITICOS E TENDENCIAS DO DIA.</p>\n</div>\n\nNOTICIAS:\n${lista}`;\n\nreturn [{ json: { prompt, totalArticles: recent.length, noNews: false } }];"
+      },
+      "id": "p3-node-007",
+      "name": "Filtrar 24h e preparar prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1280, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "p3-cond-001",
+              "leftValue": "={{ $json.noNews }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "false"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "p3-node-008",
+      "name": "Tem noticias?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1540, 300]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "message",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Voce e um analista senior de cyberseguranca. Responda sempre em HTML formatado, em portugues do Brasil."
+            },
+            {
+              "role": "user",
+              "content": "={{ $json.prompt }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "p3-node-009",
+      "name": "OpenAI Resume e classifica",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [1800, 200],
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $env.EMAIL_DESTINO }}",
+        "subject": "=🛡️ Threat Intel Diario — {{ $now.toFormat('dd/MM/yyyy') }} ({{ $('Filtrar 24h e preparar prompt').first().json.totalArticles }} noticias)",
+        "message": "=<html><body style=\"font-family:Arial,sans-serif;max-width:700px;margin:0 auto;background:#f5f5f5;padding:20px\">\n<h1 style=\"color:#2c3e50;border-bottom:2px solid #e74c3c;padding-bottom:10px\">🛡️ Threat Intel Diario</h1>\n<p style=\"color:#777\">Gerado automaticamente em {{ $now.toFormat(\"dd/MM/yyyy 'as' HH:mm\") }} | Fontes: The Hacker News, Bleeping Computer, KrebsOnSecurity</p>\n{{ $json.message.content }}\n<hr style=\"margin-top:30px\">\n<p style=\"color:#aaa;font-size:12px\">Workflow automatizado com n8n + OpenAI — Kensei Cybersecurity</p>\n</body></html>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "p3-node-010",
+      "name": "Enviar email digest",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [2060, 200],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Todo dia as 8h": {
+      "main": [
+        [
+          {"node": "RSS The Hacker News", "type": "main", "index": 0},
+          {"node": "RSS BleepingComputer", "type": "main", "index": 0},
+          {"node": "RSS KrebsOnSecurity", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "RSS The Hacker News": {
+      "main": [
+        [{"node": "Juntar HN e Bleeping", "type": "main", "index": 0}]
+      ]
+    },
+    "RSS BleepingComputer": {
+      "main": [
+        [{"node": "Juntar HN e Bleeping", "type": "main", "index": 1}]
+      ]
+    },
+    "Juntar HN e Bleeping": {
+      "main": [
+        [{"node": "Juntar todos os feeds", "type": "main", "index": 0}]
+      ]
+    },
+    "RSS KrebsOnSecurity": {
+      "main": [
+        [{"node": "Juntar todos os feeds", "type": "main", "index": 1}]
+      ]
+    },
+    "Juntar todos os feeds": {
+      "main": [
+        [{"node": "Filtrar 24h e preparar prompt", "type": "main", "index": 0}]
+      ]
+    },
+    "Filtrar 24h e preparar prompt": {
+      "main": [
+        [{"node": "Tem noticias?", "type": "main", "index": 0}]
+      ]
+    },
+    "Tem noticias?": {
+      "main": [
+        [{"node": "OpenAI Resume e classifica", "type": "main", "index": 0}],
+        []
+      ]
+    },
+    "OpenAI Resume e classifica": {
+      "main": [
+        [{"node": "Enviar email digest", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "p3-threat-intel-v1",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": "p3-threat-intel-diario",
+  "tags": []
+}
