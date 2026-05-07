@@ -97,7 +97,7 @@
     },
     {
       "parameters": {
-        "chatId": "7996765536",
+        "chatId": "SEU_CHAT_ID_AQUI",
         "text": "=🚨 <b>ALERTA: Site fora do ar!</b>\n\n🌐 <b>URL:</b> https://naiararodrigues-naih.github.io/Desafio-Kensei-Semana5-Airbnb-Paris/\n⏰ <b>Horario:</b> {{ $now.toFormat('dd/MM/yyyy HH:mm:ss') }}\n📊 <b>Status:</b> {{ $json.statusCode ? $json.statusCode : 'Sem resposta (timeout ou DNS)' }}\n\n⚠️ Verifique imediatamente!",
         "additionalFields": {
           "parse_mode": "HTML"
@@ -117,7 +117,7 @@
     },
     {
       "parameters": {
-        "chatId": "7996765536",
+        "chatId": "SEU_CHAT_ID_AQUI",
         "text": "=✅ <b>Site voltou ao ar!</b>\n\n🌐 <b>URL:</b> https://naiararodrigues-naih.github.io/Desafio-Kensei-Semana5-Airbnb-Paris/\n⏰ <b>Horario:</b> {{ $now.toFormat('dd/MM/yyyy HH:mm:ss') }}\n📊 <b>Status:</b> 200 OK\n\n✨ Tudo funcionando normalmente.",
         "additionalFields": {
           "parse_mode": "HTML"
