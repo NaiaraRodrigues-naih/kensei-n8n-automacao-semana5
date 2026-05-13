@@ -1,5 +1,5 @@
 {
-  "name": "Monitor de Email Vazado - HaveIBeenPwned",
+  "name": "Monitor de Email Vazado - XposedOrNot",
   "nodes": [
     {
       "parameters": {
@@ -17,14 +17,10 @@
     },
     {
       "parameters": {
-        "url": "=https://haveibeenpwned.com/api/v3/breachedaccount/{{ encodeURIComponent($json.body.email) }}",
+        "url": "=https://api.xposedornot.com/v1/breach-analytics?email={{ encodeURIComponent($json.body.email) }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "hibp-api-key",
-              "value": "={{ $env.HIBP_API_KEY }}"
-            },
             {
               "name": "User-Agent",
               "value": "n8n-monitor-email-vazado"
@@ -40,7 +36,7 @@
         }
       },
       "id": "node-0002",
-      "name": "HaveIBeenPwned API",
+      "name": "API XposedOrNot",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [480, 300]
@@ -56,7 +52,7 @@
           "conditions": [
             {
               "id": "cond-001",
-              "leftValue": "={{ Array.isArray($json) && $json.length > 0 }}",
+              "leftValue": "={{ $json?.ExposedBreaches?.breaches_details !== undefined && $json.ExposedBreaches.breaches_details.length > 0 }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -75,7 +71,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const email = $('Webhook').first().json.body.email;\nconst breaches = $input.first().json;\n\nconst lista = breaches.slice(0, 5).map((b, i) => {\n  const dados = (b.DataClasses || []).slice(0, 4).join(', ');\n  return `${i + 1}. *${b.Name}* (${b.BreachDate ? b.BreachDate.substring(0, 4) : 'desconhecido'})\\n   Contas afetadas: ${b.PwnCount ? b.PwnCount.toLocaleString('pt-BR') : 'N/A'}\\n   Dados expostos: ${dados}`;\n}).join('\\n\\n');\n\nconst total = breaches.length;\nconst aviso = total > 5 ? `\\n\\n_(e mais ${total - 5} outros vazamentos)_` : '';\n\nreturn {\n  email,\n  total_vazamentos: total,\n  mensagem: `🚨 *ALERTA DE VAZAMENTO!*\\n\\nO email *${email}* foi encontrado em *${total} vazamento(s)*:\\n\\n${lista}${aviso}\\n\\n⚠️ Recomendacao: troque suas senhas imediatamente e ative autenticacao em dois fatores.`\n};"
+        "jsCode": "const email = $('Webhook').first().json.body.email;\nconst data = $input.first().json;\nconst breaches = data?.ExposedBreaches?.breaches_details || [];\nconst total = breaches.length;\n\nconst lista = breaches.slice(0, 5).map((b, i) => {\n  const dados = (b.xposed_data || '').split(';').slice(0, 4).join(', ');\n  return `${i + 1}. *${b.breach}* (${b.xposed_date ? b.xposed_date.substring(0, 4) : '?'})\\n   Contas: ${b.xposed_records ? Number(b.xposed_records).toLocaleString('pt-BR') : 'N/A'}\\n   Dados: ${dados}`;\n}).join('\\n\\n');\n\nconst aviso = total > 5 ? `\\n\\n_(e mais ${total - 5} outros vazamentos)_` : '';\n\nreturn {\n  email,\n  total_vazamentos: total,\n  mensagem: `🚨 *ALERTA DE VAZAMENTO!*\\n\\nO email *${email}* foi encontrado em *${total} vazamento(s)*:\\n\\n${lista}${aviso}\\n\\n⚠️ Troque suas senhas e ative autenticacao em dois fatores.`\n};"
       },
       "id": "node-0004",
       "name": "Formatar Alerta",
@@ -85,7 +81,7 @@
     },
     {
       "parameters": {
-        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "chatId": "SEU_CHAT_ID_AQUI",
         "text": "={{ $json.mensagem }}",
         "additionalFields": {
           "parse_mode": "Markdown"
@@ -127,7 +123,7 @@
     },
     {
       "parameters": {
-        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "chatId": "SEU_CHAT_ID_AQUI",
         "text": "={{ $json.mensagem }}",
         "additionalFields": {
           "parse_mode": "Markdown"
@@ -160,9 +156,9 @@
   ],
   "connections": {
     "Webhook": {
-      "main": [[{ "node": "HaveIBeenPwned API", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "API XposedOrNot", "type": "main", "index": 0 }]]
     },
-    "HaveIBeenPwned API": {
+    "API XposedOrNot": {
       "main": [[{ "node": "Email foi vazado?", "type": "main", "index": 0 }]]
     },
     "Email foi vazado?": {
@@ -186,5 +182,5 @@
   },
   "active": false,
   "settings": { "executionOrder": "v1" },
-  "versionId": "monitor-email-v1"
+  "versionId": "monitor-email-v2"
 }
