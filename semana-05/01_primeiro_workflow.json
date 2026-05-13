@@ -1,0 +1,145 @@
+{
+  "name": "Frase motivacional com OpenAI para Google Sheets",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "2f96f9d0-0d2f-4bcb-9f68-3ed663aa6a49",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "message",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Voce e um assistente que escreve frases motivacionais curtas, originais e positivas em portugues do Brasil."
+            },
+            {
+              "role": "user",
+              "content": "Gere uma unica frase motivacional curta para comecar o dia. Responda apenas com a frase, sem aspas e sem explicacoes."
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.9
+        }
+      },
+      "id": "0d0d9d16-4950-40d8-aa8e-7c99f96f3b09",
+      "name": "Gerar frase com OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [500, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0b9ed0f4-522f-4c97-89a4-1b10cdb1ca1b",
+              "name": "data",
+              "type": "string",
+              "value": "={{ $now.toFormat('yyyy-MM-dd HH:mm:ss') }}"
+            },
+            {
+              "id": "33e6f029-27f1-4bce-9946-6bbd7bfe19fe",
+              "name": "frase",
+              "type": "string",
+              "value": "={{ $json.message?.content || $json.text || $json.output || $json.choices?.[0]?.message?.content }}"
+            },
+            {
+              "id": "314d318a-813f-4527-8dd7-3ac1e579f451",
+              "name": "fonte",
+              "type": "string",
+              "value": "OpenAI"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "33323786-45a0-4ce7-9dac-89239a696457",
+      "name": "Preparar linha da planilha",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [760, 300]
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1HLSZb6p0W7GbSpdjMbH3VPBLrTjex8UysEZAIAGA0jU",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Frases",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "data": "={{ $json.data }}",
+            "frase": "={{ $json.frase }}",
+            "fonte": "={{ $json.fonte }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {"id": "data", "displayName": "data", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "frase", "displayName": "frase", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "fonte", "displayName": "fonte", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true}
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "7c39bb6b-4868-40fb-bf48-a387c8b07011",
+      "name": "Salvar no Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1020, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{"node": "Gerar frase com OpenAI", "type": "main", "index": 0}]]
+    },
+    "Gerar frase com OpenAI": {
+      "main": [[{"node": "Preparar linha da planilha", "type": "main", "index": 0}]]
+    },
+    "Preparar linha da planilha": {
+      "main": [[{"node": "Salvar no Google Sheets", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {"executionOrder": "v1"},
+  "versionId": "8d21be2f-6788-4da2-8b6d-cfd5b61f96b4",
+  "meta": {"templateCredsSetupCompleted": false},
+  "id": "p1-frase-openai-sheets",
+  "tags": []
+}

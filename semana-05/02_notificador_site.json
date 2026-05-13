@@ -1,0 +1,173 @@
+{
+  "name": "Notificador de Site Down",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "A cada 5 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://naiararodrigues-naih.github.io/Desafio-Kensei-Semana5-Airbnb-Paris/",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "name": "Checar site",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Le o estado salvo da ultima execucao\nconst staticData = $getWorkflowStaticData('global');\nconst previousStatus = staticData.siteStatus || 'up';\n\n// Determina status atual\nconst statusCode = $input.first().json.statusCode;\nconst currentStatus = statusCode === 200 ? 'up' : 'down';\n\n// Salva estado atual para a proxima execucao\nstaticData.siteStatus = currentStatus;\n\n// Determina acao\nlet action = 'none';\nif (currentStatus === 'down' && previousStatus === 'up') action = 'alert_down';\nif (currentStatus === 'up'   && previousStatus === 'down') action = 'alert_up';\n\nreturn [{\n  json: {\n    currentStatus,\n    previousStatus,\n    statusCode: statusCode || null,\n    action\n  }\n}];"
+      },
+      "id": "a1b2c3d4-0003-4000-8000-000000000003",
+      "name": "Verificar estado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [760, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "alert_down",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Site Caiu"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "alert_up",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Site Voltou"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0004-4000-8000-000000000004",
+      "name": "O que mudou?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1020, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "SEU_CHAT_ID_AQUI",
+        "text": "=🚨 <b>ALERTA: Site fora do ar!</b>\n\n🌐 <b>URL:</b> https://naiararodrigues-naih.github.io/Desafio-Kensei-Semana5-Airbnb-Paris/\n⏰ <b>Horario:</b> {{ $now.toFormat('dd/MM/yyyy HH:mm:ss') }}\n📊 <b>Status:</b> {{ $json.statusCode ? $json.statusCode : 'Sem resposta (timeout ou DNS)' }}\n\n⚠️ Verifique imediatamente!",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "a1b2c3d4-0005-4000-8000-000000000005",
+      "name": "Alerta Site Caiu",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1280, 180],
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "SEU_CHAT_ID_AQUI",
+        "text": "=✅ <b>Site voltou ao ar!</b>\n\n🌐 <b>URL:</b> https://naiararodrigues-naih.github.io/Desafio-Kensei-Semana5-Airbnb-Paris/\n⏰ <b>Horario:</b> {{ $now.toFormat('dd/MM/yyyy HH:mm:ss') }}\n📊 <b>Status:</b> 200 OK\n\n✨ Tudo funcionando normalmente.",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "a1b2c3d4-0006-4000-8000-000000000006",
+      "name": "Aviso Site Voltou",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1280, 420],
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "A cada 5 minutos": {
+      "main": [
+        [{"node": "Checar site", "type": "main", "index": 0}]
+      ]
+    },
+    "Checar site": {
+      "main": [
+        [{"node": "Verificar estado", "type": "main", "index": 0}]
+      ]
+    },
+    "Verificar estado": {
+      "main": [
+        [{"node": "O que mudou?", "type": "main", "index": 0}]
+      ]
+    },
+    "O que mudou?": {
+      "main": [
+        [{"node": "Alerta Site Caiu", "type": "main", "index": 0}],
+        [{"node": "Aviso Site Voltou", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "p2-site-down-notifier-v2",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": "p2-notificador-site-down",
+  "tags": []
+}

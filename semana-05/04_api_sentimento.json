@@ -1,0 +1,128 @@
+{
+  "name": "Projeto 4 - API Pessoal com Webhook",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sentiment",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "sentiment-webhook"
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "message",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "Voce e um analisador de sentimentos e extrator de palavras-chave. Analise o texto recebido e retorne SOMENTE um JSON valido (sem markdown, sem explicacoes) com este formato exato:\n{\n  \"sentimento\": \"positivo\" | \"negativo\" | \"neutro\",\n  \"confianca\": 0.00,\n  \"palavras_chave\": [\"palavra1\", \"palavra2\", \"palavra3\"]\n}\n\nRegras:\n- sentimento: exatamente uma das tres opcoes\n- confianca: numero de 0.00 a 1.00 indicando certeza da classificacao\n- palavras_chave: lista com 3 a 5 palavras mais relevantes do texto\n- Retorne APENAS o JSON, sem nenhum texto adicional"
+            },
+            {
+              "role": "user",
+              "content": "={{ $json.body.texto }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "a1b2c3d4-0002-0002-0002-000000000002",
+      "name": "OpenAI - Analisar Sentimento",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.4,
+      "position": [480, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "SEU_CREDENTIAL_ID",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const resposta = $input.first().json.message.content;\n\nlet resultado;\ntry {\n  resultado = JSON.parse(resposta);\n} catch (e) {\n  const jsonMatch = resposta.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    resultado = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('OpenAI nao retornou JSON valido: ' + resposta);\n  }\n}\n\nconst sentimentosValidos = ['positivo', 'negativo', 'neutro'];\nif (!sentimentosValidos.includes(resultado.sentimento)) {\n  throw new Error('Sentimento invalido: ' + resultado.sentimento);\n}\n\nreturn {\n  sentimento: resultado.sentimento,\n  confianca: parseFloat(resultado.confianca.toFixed(2)),\n  palavras_chave: resultado.palavras_chave\n};"
+      },
+      "id": "a1b2c3d4-0003-0003-0003-000000000003",
+      "name": "Formatar Resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "a1b2c3d4-0004-0004-0004-000000000004",
+      "name": "Respond JSON",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [960, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Analisar Sentimento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Analisar Sentimento": {
+      "main": [
+        [
+          {
+            "node": "Formatar Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatar Resposta": {
+      "main": [
+        [
+          {
+            "node": "Respond JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "projeto4-v1"
+}
