@@ -1,0 +1,190 @@
+{
+  "name": "Monitor de Email Vazado - HaveIBeenPwned",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "check-email",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-0001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "check-email-webhook"
+    },
+    {
+      "parameters": {
+        "url": "=https://haveibeenpwned.com/api/v3/breachedaccount/{{ encodeURIComponent($json.body.email) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "hibp-api-key",
+              "value": "={{ $env.HIBP_API_KEY }}"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-monitor-email-vazado"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "node-0002",
+      "name": "HaveIBeenPwned API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-001",
+              "leftValue": "={{ Array.isArray($json) && $json.length > 0 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "node-0003",
+      "name": "Email foi vazado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const email = $('Webhook').first().json.body.email;\nconst breaches = $input.first().json;\n\nconst lista = breaches.slice(0, 5).map((b, i) => {\n  const dados = (b.DataClasses || []).slice(0, 4).join(', ');\n  return `${i + 1}. *${b.Name}* (${b.BreachDate ? b.BreachDate.substring(0, 4) : 'desconhecido'})\\n   Contas afetadas: ${b.PwnCount ? b.PwnCount.toLocaleString('pt-BR') : 'N/A'}\\n   Dados expostos: ${dados}`;\n}).join('\\n\\n');\n\nconst total = breaches.length;\nconst aviso = total > 5 ? `\\n\\n_(e mais ${total - 5} outros vazamentos)_` : '';\n\nreturn {\n  email,\n  total_vazamentos: total,\n  mensagem: `🚨 *ALERTA DE VAZAMENTO!*\\n\\nO email *${email}* foi encontrado em *${total} vazamento(s)*:\\n\\n${lista}${aviso}\\n\\n⚠️ Recomendacao: troque suas senhas imediatamente e ative autenticacao em dois fatores.`\n};"
+      },
+      "id": "node-0004",
+      "name": "Formatar Alerta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 180]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.mensagem }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "node-0005",
+      "name": "Telegram - Alerta Vazamento",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1200, 180],
+      "credentials": {
+        "telegramApi": {
+          "id": "SEU_TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ email: $('Formatar Alerta').first().json.email, vazado: true, total_vazamentos: $('Formatar Alerta').first().json.total_vazamentos, alerta_enviado: true }) }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "node-0006",
+      "name": "Resposta - Vazado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1440, 180]
+    },
+    {
+      "parameters": {
+        "jsCode": "const email = $('Webhook').first().json.body.email;\nreturn {\n  email,\n  mensagem: `✅ *Email seguro!*\\n\\nO email *${email}* NAO foi encontrado em nenhum vazamento conhecido.\\n\\n🛡️ Continue usando senhas fortes e unicas para cada servico.`\n};"
+      },
+      "id": "node-0007",
+      "name": "Formatar OK",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 420]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.mensagem }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "node-0008",
+      "name": "Telegram - Email Seguro",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1200, 420],
+      "credentials": {
+        "telegramApi": {
+          "id": "SEU_TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ email: $('Formatar OK').first().json.email, vazado: false, total_vazamentos: 0, alerta_enviado: false }) }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "node-0009",
+      "name": "Resposta - Seguro",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1440, 420]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "HaveIBeenPwned API", "type": "main", "index": 0 }]]
+    },
+    "HaveIBeenPwned API": {
+      "main": [[{ "node": "Email foi vazado?", "type": "main", "index": 0 }]]
+    },
+    "Email foi vazado?": {
+      "main": [
+        [{ "node": "Formatar Alerta", "type": "main", "index": 0 }],
+        [{ "node": "Formatar OK", "type": "main", "index": 0 }]
+      ]
+    },
+    "Formatar Alerta": {
+      "main": [[{ "node": "Telegram - Alerta Vazamento", "type": "main", "index": 0 }]]
+    },
+    "Telegram - Alerta Vazamento": {
+      "main": [[{ "node": "Resposta - Vazado", "type": "main", "index": 0 }]]
+    },
+    "Formatar OK": {
+      "main": [[{ "node": "Telegram - Email Seguro", "type": "main", "index": 0 }]]
+    },
+    "Telegram - Email Seguro": {
+      "main": [[{ "node": "Resposta - Seguro", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "versionId": "monitor-email-v1"
+}
